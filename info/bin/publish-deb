@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# reprepro -V --basedir /home/tech/repositories/apt/baseblack --component testing includedeb ubuntu-lucid mocha-wrapper_1-baseblack-r3_all.deb
+EXPECTED_ARGS=2
+E_BADARGS=64
+if [ $# -ne $EXPECTED_ARGS ]; then
+	echo "Usage: `basename $0` COMPONENT (stable|unstable) PACKAGE_NAME (customthingy4.0_4.0.1-baseblack-r999_all.deb)"
+	exit $E_BADARGS
+fi
+
+REPOSITORY="baseblack-lucid"
+
+COMPONENT=$1
+PACKAGE_FILE=$2
+reprepro -V --basedir /home/tech/repositories/apt/${REPOSITORY} --component ${COMPONENT} includedeb ${REPOSITORY} ${PACKAGE_FILE}

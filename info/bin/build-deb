@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+if [ ! -d info ];then
+	echo "You are not inside an Application or Application-wrapper directory"
+	exit 1
+fi
+
+MY_CHECKSUM=$(md5sum ${0} |cut -f1 -d' ')
+LOCAL_CHECKSUM=$(md5sum info/bin/build-deb |cut -f1 -d' ')
+
+if [[ $MY_CHECKSUM != $LOCAL_CHECKSUM ]]; then
+	echo "Local build script differs from Master, using that instead."
+	bash info/bin/build-deb
+	exit $?
+fi
+
+if [ ! -f info/BUILD_VERSION ]; then
+	# I _think_ this is how Jenkins is going to function
+	if [ "$BUILD_VERSION" == "" ]; then
+		echo "BUILD_VERSION:"
+		read BUILD_VERSION
+	else
+		echo "building version $BUILD_VERSION"
+	fi
+fi
+
+PACKAGE_NAME=`cat info/NAME`
+PACKAGE_DESC=`cat info/DESCRIPTION`
+PACKAGE_URL=`cat info/URL`
+PACKAGE_VERS=`cat info/VERSION`
+
+if [[ $PACKAGE_NAME == *wrapper* ]]; then
+	PACKAGE_ARCH=`cat info/ARCH`
+else
+	PACKAGE_ARCH=`uname -m`
+fi
+
+PACKAGE_BUILD_VERSION=`cat info/BUILD_VERSION`
+
+
+if [ -f info/$PACKAGE_NAME.postinst ]; then
+	fpm -n $PACKAGE_NAME \
+	   -v $PACKAGE_VERS \
+	   -a $PACKAGE_ARCH \
+	   -s dir \
+	   -C src \
+	   -t deb \
+	   --post-install info/$PACKAGE_NAME.postinst \
+	   --url "$PACKAGE_URL" \
+	   --description "$PACKAGE_DESC" \
+	   --iteration "baseblack-r$PACKAGE_BUILD_VERSION" \
+	   --replaces "$PACKAGE_NAME (<< $PACKAGE_VERS)" 
+
+elif [ -f info/$PACKAGE_NAME.postrm ]; then
+
+	fpm -n $PACKAGE_NAME \
+	   -v $PACKAGE_VERS \
+	   -a $PACKAGE_ARCH \
+	   -s dir \
+	   -C src \
+	   -t deb \
+	   --post-uninstall info/$PACKAGE_NAME.postrm \
+	   --url "$PACKAGE_URL" \
+	   --description "$PACKAGE_DESC" \
+	   --iteration "baseblack-r$PACKAGE_BUILD_VERSION" \
+	   --replaces "$PACKAGE_NAME (<< $PACKAGE_VERS)" 
+
+elif [ -f info/$PACKAGE_NAME.postrm ]; then
+	if [ -f -f info/$PACKAGE_NAME.postinst ]; then
+		fpm -n $PACKAGE_NAME \
+		   -v $PACKAGE_VERS \
+		   -a $PACKAGE_ARCH \
+		   -s dir \
+		   -C src \
+		   -t deb \
+		   --post-uninstall info/$PACKAGE_NAME.postrm \
+		   --post-install info/$PACKAGE_NAME.postinst \
+		   --url "$PACKAGE_URL" \
+		   --description "$PACKAGE_DESC" \
+		   --iteration "baseblack-r$PACKAGE_BUILD_VERSION" \
+		   --replaces "$PACKAGE_NAME (<< $PACKAGE_VERS)"
+	fi
+
+else 
+	fpm -n $PACKAGE_NAME \
+	   -v $PACKAGE_VERS \
+	   -a $PACKAGE_ARCH \
+	   -s dir \
+	   -C src \
+	   -t deb \
+	   --url "$PACKAGE_URL" \
+	   --description "$PACKAGE_DESC" \
+	   --iteration "baseblack-r$PACKAGE_BUILD_VERSION" \
+	   --replaces "$PACKAGE_NAME (<< $PACKAGE_VERS)"
+fi
+
+echo `expr ${PACKAGE_BUILD_VERSION} + 1` > info/BUILD_VERSION
+
+exit ${PIPESTATUS[0]}
